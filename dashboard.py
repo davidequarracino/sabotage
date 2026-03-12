@@ -1,38 +1,54 @@
 import streamlit as st
-import os
 from supabase import create_client
 
-# Page config
-st.set_page_config(page_title="sabotage | Intelligence Dashboard", layout="wide")
-st.title("🕵️ sabotage - Ransomware Feed")
+# Page configuration
+st.set_page_config(page_title="Sabotage Intelligence", layout="wide")
 
-# Initialize connection
-@st.cache_resource
-def init_connection():
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+st.title("Sabotage - Ransomware Incident Feed")
 
-supabase = init_connection()
+# Secure connection to Supabase via Streamlit Secrets
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
 
-# Fetch data
-def fetch_data():
-    res = supabase.table("cyber_leaks").select("*").order("created_at", desc=True).execute()
-    return res.data
+# Sidebar for intelligence filtering
+st.sidebar.header("Data Filtering")
+search = st.sidebar.text_input("Search Company or Threat Group")
 
-data = fetch_data()
+# Fetch data from Supabase, ordered by most recent leak
+query = supabase.table("incidents").select("*").order("leak_date", desc=True)
+data = query.execute()
 
-if data:
-    # Stats
-    st.metric("Total Incidents", len(data))
+if data.data:
+    incidents = data.data
     
-    # Data Table
+    # In-memory filtering for responsive UI
+    if search:
+        incidents = [i for i in incidents if search.lower() in str(i).lower()]
+
+    st.metric("Total Incidents", len(incidents))
+
+    # Link formatting and data cleaning
+    for item in incidents:
+        link = item.get('evidence_link', '')
+        # Only render valid HTTP links to avoid broken UI
+        if link and link.startswith('http'):
+            item['Evidence'] = link
+        else:
+            item['Evidence'] = None
+
+    # Professional data display with LinkColumn support
     st.dataframe(
-        data, 
+        incidents,
+        column_order=("company_name", "leak_date", "threat_group", "Evidence"),
         column_config={
-            "website_url": st.column_config.LinkColumn("Evidence Link"),
-            "created_at": st.column_config.DatetimeColumn("Ingestion Date")
+            "company_name": "Target Organization",
+            "leak_date": "Discovery Date",
+            "threat_group": "Threat Actor",
+            "Evidence": st.column_config.LinkColumn("Evidence URL", display_text="External Link")
         },
         use_container_width=True,
         hide_index=True
     )
 else:
-    st.info("No data available in the pipeline.")
+    st.info("No intelligence records found in the database.")
