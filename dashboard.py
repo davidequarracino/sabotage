@@ -16,7 +16,8 @@ st.sidebar.header("Data Filtering")
 search = st.sidebar.text_input("Search Company or Threat Group")
 
 # Fetch data from Supabase, ordered by most recent leak
-query = supabase.table("incidents").select("*").order("leak_date", desc=True)
+# Fetch data from Supabase, ordered by most recent leak
+query = supabase.table("cyber_leaks").select("*").order("leak_date", desc=True)
 data = query.execute()
 
 if data.data:
