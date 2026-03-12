@@ -1,54 +1,40 @@
 import streamlit as st
 from supabase import create_client
+import pandas as pd
 
-# Page configuration
 st.set_page_config(page_title="Sabotage Intelligence", layout="wide")
-
 st.title("Sabotage - Ransomware Incident Feed")
 
-# Secure connection to Supabase via Streamlit Secrets
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase = create_client(url, key)
 
-# Sidebar for intelligence filtering
-st.sidebar.header("Data Filtering")
-search = st.sidebar.text_input("Search Company or Threat Group")
+# Fetch dati aggiornati
+data_req = supabase.table("cyber_leaks").select("*").order("leak_date", desc=True).execute()
 
-# Fetch data from Supabase, ordered by most recent leak
-# Fetch data from Supabase, ordered by most recent leak
-query = supabase.table("cyber_leaks").select("*").order("leak_date", desc=True)
-data = query.execute()
-
-if data.data:
-    incidents = data.data
+if data_req.data:
+    df = pd.DataFrame(data_req.data)
     
-    # In-memory filtering for responsive UI
+    st.sidebar.metric("Total Incidents", len(df))
+    search = st.sidebar.text_input("Search Company or Group")
+    
     if search:
-        incidents = [i for i in incidents if search.lower() in str(i).lower()]
+        df = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
 
-    st.metric("Total Incidents", len(incidents))
+    # Funzione per rendere l'URL un'icona cliccabile
+    def linkify(url):
+        if url and str(url).startswith("http"):
+            return f'<a href="{url}" target="_blank">🖼️ View Evidence</a>'
+        return "N/A"
 
-    # Link formatting and data cleaning
-    for item in incidents:
-        link = item.get('evidence_link', '')
-        # Only render valid HTTP links to avoid broken UI
-        if link and link.startswith('http'):
-            item['Evidence'] = link
-        else:
-            item['Evidence'] = None
+    # Selezione colonne per la visualizzazione
+    display_df = df[['company_name', 'leak_date', 'threat_group', 'evidence_url']].copy()
+    display_df['evidence_url'] = display_df['evidence_url'].apply(linkify)
 
-    # Professional data display with LinkColumn support
-    st.dataframe(
-        incidents,
-        column_order=("company_name", "leak_date", "threat_group", "Evidence"),
-        column_config={
-            "company_name": "Target Organization",
-            "leak_date": "Discovery Date",
-            "threat_group": "Threat Actor",
-            "Evidence": st.column_config.LinkColumn("Evidence URL", display_text="External Link")
-        },
-        use_container_width=True,
+    # Rendering tabella con supporto HTML
+    st.write(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+else:
+    st.info("No intelligence records found. Run the harvester to populate the database.")
         hide_index=True
     )
 else:
