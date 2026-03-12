@@ -43,8 +43,14 @@ if data_req.data:
             return f'<a href="{url}" target="_blank">🔗 View Evidence</a>'
         return "N/A"
 
-    display_df = df[['company_name', 'leak_date', 'threat_group', 'evidence_url']].copy()
-    display_df['evidence_url'] = display_df['evidence_url'].apply(linkify)
+    cols = ['company_name', 'leak_date', 'threat_group']
+    if 'evidence_url' in df.columns:
+        cols.append('evidence_url')
+        display_df = df[cols].copy()
+        display_df['evidence_url'] = display_df['evidence_url'].apply(linkify)
+    else:
+        display_df = df[cols].copy()
+        display_df['evidence_url'] = "Pending Sync..."
 
     st.write(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
 else:
