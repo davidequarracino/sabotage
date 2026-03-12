@@ -1,32 +1,24 @@
-import os
-import requests
+import os, requests
 from supabase import create_client
 
-# Load secure credentials from GitHub environment
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-
-# Initialize the Supabase client
-supabase = create_client(url, key)
-
-def test_pipeline():
-    print("--- Intelligence Harvester Started ---")
+def harvest():
+    # Connessione immediata
+    db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
     
-    # This is a sample record to verify the connection
-    # In the future, this will be replaced by real scraped data
-    mock_data = {
-        "company_name": "Acme Global Testing",
-        "leak_date": "2026-03-12",
-        "threat_group": "Alpha-Test-Unit",
-        "website_url": "https://example.com/security-alert"
-    }
+    # Recupero dati reali (Sorgente: Ransomware.live)
+    leaks = requests.get("https://api.ransomware.live/leaks", timeout=15).json()[:30]
+    
+    # Costruzione payload bulk
+    payload = [{
+        "company_name": l.get("victim", "Unknown"),
+        "leak_date": l.get("published", ""),
+        "threat_group": l.get("group", "Unknown"),
+        "website_url": l.get("website", "N/A")
+    } for l in leaks]
 
-    try:
-        # Insert the data into your Supabase 'cyber_leaks' table
-        response = supabase.table("cyber_leaks").insert(mock_data).execute()
-        print(f"SUCCESS: Data successfully stored for {mock_data['company_name']}")
-    except Exception as e:
-        print(f"ERROR: Connection failed. Details: {e}")
+    # Invio atomico a Supabase
+    db.table("cyber_leaks").upsert(payload, on_conflict="website_url").execute()
+    print(f"Sincronizzati {len(payload)} incidenti.")
 
 if __name__ == "__main__":
-    test_pipeline()
+    harvest()
