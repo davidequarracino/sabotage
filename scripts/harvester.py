@@ -6,15 +6,20 @@ def harvest():
     url = "https://api.ransomware.live/recentvictims"
     headers = {'User-Agent': 'Mozilla/5.0'}
     
-    res = requests.get(url, headers=headers)
-    print("STATUS CODE:", res.status_code)
-    print("PAYLOAD GREZZO (primi 200 char):", res.text[:200])
-    
-    data = res.json()
-    print("NUMERO ELEMENTI RICEVUTI:", len(data))
-    
-    # Se la lista è vuota, blocchiamo l'esecuzione per vedere l'errore nel log
-    assert len(data) > 0, "L'API ha restituito una lista vuota."
+    res = requests.get(url, headers=headers, timeout=20)
+    if res.status_code == 200:
+        data = res.json()[:50]
+        payload = []
+        for l in data:
+            payload.append({
+                "company_name": str(l.get("victim", "N/A")),
+                "leak_date": str(l.get("discovered", "")),
+                "threat_group": str(l.get("group", "Unknown")),
+                "website_url": str(l.get("website", "N/A"))
+            })
+        
+        db.table("cyber_leaks").upsert(payload, on_conflict="website_url").execute()
+        print(f"Sync complete: {len(payload)} records pushed.")
 
 if __name__ == "__main__":
     harvest()
