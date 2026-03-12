@@ -1,8 +1,9 @@
 name: Data Pipeline
+
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Runs every hour
-  workflow_dispatch: # Allows manual trigger for testing
+    - cron: '0 */12 * * *'
 
 jobs:
   run-scraper:
@@ -17,10 +18,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests pandas supabase python-dotenv
+        run: pip install requests supabase
 
       - name: Run Harvester
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/harvester.py
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scripts/harvester.py
