@@ -5,10 +5,8 @@ from urllib3.util.retry import Retry
 from supabase import create_client
 
 def harvest():
-    # Setup Supabase
     db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
     
-    # Configure retry strategy
     session = requests.Session()
     retry_strategy = Retry(
         total=5,
@@ -24,35 +22,28 @@ def harvest():
         print(f"Requesting data from: {url}...")
         res = session.get(url, headers=headers, timeout=60)
         res.raise_for_status()
-        
         raw_data = res.json()
-        
-        # Deduplication logic: use a dictionary to keep only one entry per website_url
+
         unique_leaks = {}
         for l in raw_data:
             site = l.get("website", "N/A")
-            # If we haven't seen this site yet, add it to our dictionary
             if site not in unique_leaks and site != "N/A":
-       unique_leaks[site] = {
-                "company_name": str(l.get("victim", l.get("post_title", l.get("website", "Unknown Victim")))),
-                "leak_date": str(l.get("discovered", l.get("published", l.get("date", "")))),
-                "threat_group": str(l.get("group", "Unknown Group")),
-                "website_url": site,
-                "evidence_url": str(l.get("screenshot", ""))
-            }
-        
-        # Convert dictionary back to a list
+                unique_leaks[site] = {
+                    "company_name": str(l.get("victim", l.get("post_title", l.get("website", "Unknown Victim")))),
+                    "leak_date": str(l.get("discovered", l.get("published", l.get("date", "")))),
+                    "threat_group": str(l.get("group", "Unknown Group")),
+                    "website_url": site,
+                    "evidence_url": str(l.get("screenshot", ""))
+                }
+
         payload = list(unique_leaks.values())[:50]
         
         if payload:
             db.table("cyber_leaks").upsert(payload, on_conflict="website_url").execute()
             print(f"Successfully synced {len(payload)} unique records.")
-        else:
-            print("No valid records found to sync.")
-            
+
     except Exception as e:
-        # Logging error without failing the entire workflow
-        print(f"Sync failed: {e}")
-        
+        print(f"Error during harvest: {e}")
+
 if __name__ == "__main__":
     harvest()
