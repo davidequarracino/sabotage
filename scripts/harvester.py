@@ -33,12 +33,13 @@ def harvest():
             site = l.get("website", "N/A")
             # If we haven't seen this site yet, add it to our dictionary
             if site not in unique_leaks and site != "N/A":
-                unique_leaks[site] = {
+       unique_leaks[site] = {
                 "company_name": str(l.get("victim", l.get("post_title", l.get("website", "Unknown Victim")))),
                 "leak_date": str(l.get("discovered", l.get("published", l.get("date", "")))),
                 "threat_group": str(l.get("group", "Unknown Group")),
-                "website_url": site
-            }  #
+                "website_url": site,
+                "evidence_url": str(l.get("screenshot", ""))
+            }
         
         # Convert dictionary back to a list
         payload = list(unique_leaks.values())[:50]
